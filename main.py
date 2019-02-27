@@ -20,7 +20,7 @@ async def on_ready():
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)
-    initial_extensions = ['commands.' + i.split('.')[0] for i in os.listdir('commands') if '.py' in i]
+    initial_extensions = ['commands.' + i.split('.')[0] for i in os.listdir('utils/commands') if '.py' in i]
     logging.info(f'Extensions: {initial_extensions}')
     for extension in initial_extensions:
         try:
