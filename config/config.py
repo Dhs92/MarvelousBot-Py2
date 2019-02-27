@@ -3,7 +3,7 @@ import json
 
 class Config:
 
-    def __init__(self, filename='config.json'):
+    def __init__(self, filename='config/config.json'):
 
         self.token = int()
         self.shards = int()

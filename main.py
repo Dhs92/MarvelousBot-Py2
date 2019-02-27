@@ -1,12 +1,10 @@
 import logging
+import os
 
 import discord
 from discord.ext import commands
 
 from config.config import Config
-
-initial_extensions = ['commands.guildboss',
-                      'commands.quit_bot']
 
 bot = commands.Bot(command_prefix='?')
 config = Config()
@@ -22,6 +20,8 @@ async def on_ready():
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)
+    initial_extensions = ['commands.' + i.split('.')[0] for i in os.listdir('commands') if '.py' in i]
+    logging.info(f'Extensions: {initial_extensions}')
     for extension in initial_extensions:
         try:
             bot.load_extension(extension)
