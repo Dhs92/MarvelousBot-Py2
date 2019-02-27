@@ -84,6 +84,11 @@ class Guild(commands.Cog):
         else:
             await ctx.send("Fuck something went wrong")
 
+    @guild_war.error
+    async def summon_error(self, ctx, error):
+        if isinstance(error, commands.CheckFailure):
+            await ctx.send("You do not have permission to run this command!")
+
     async def schedule_message(self):
         await self.bot.wait_until_ready()
         channel = self.bot.get_channel(int(config.channel))
