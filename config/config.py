@@ -5,36 +5,39 @@ class Config:
 
     def __init__(self, filename='config/config.json'):
 
-        self.token = int()
-        self.shards = int()
-        self.channel = int()
-        self.adminID = int()
-        self.coAdminID = int()
+        self.token: str = ''
+        self.shards: int = 0
+        self.channel: int = 0
+        self.adminID: int = 0
+        self.coAdminID: int = 0
+        self.Owner: int = 0
 
         try:
             file = open(filename, 'x')
-            self.writeconf(file)
-        except:
+            self.write_conf(file)
+        except FileExistsError:
             file = open(filename, 'r')
-            self.readconf(file)
+            self.read_conf(file)
 
         file.close()
 
-    def writeconf(self, file):
+    def write_conf(self, file):
         output = {
             'token': '$YOURTOKENHERE',
             'shards': '5',
             'channel': '$YOURCHANNELIDHERE',
             'admin': '$ADMINID',
             'co-admin': '$COADAMINID',
+            'owner': '$YOURIDHERE'
         }
         file.write(json.dumps(output))
 
-    def readconf(self, file):
-        configIn = file.read()
-        configParsed = json.loads(configIn)
-        self.token = configParsed['token']
-        self.shards = configParsed['shards']
-        self.channel = configParsed['channel']
-        self.adminID = configParsed['admin']
-        self.coAdminID = configParsed['co-admin']
+    def read_conf(self, file):
+        config_in = file.read()
+        config_parsed = json.loads(config_in)
+        self.token = config_parsed['token']
+        self.shards = int(config_parsed['shards'])
+        self.channel = int(config_parsed['channel'])
+        self.adminID = int(config_parsed['admin'])
+        self.coAdminID = int(config_parsed['co-admin'])
+        self.Owner = int(config_parsed['owner'])

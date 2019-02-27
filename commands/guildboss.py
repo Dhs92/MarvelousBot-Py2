@@ -19,7 +19,7 @@ class GuildBoss(commands.Cog):
         self.bot = bot
         self.__summoned__ = False
 
-    @commands.command()
+    @commands.command(aliases=['summon', 'boss', 'gb'])
     @is_admin(commands, config)
     async def summoned(self, ctx, arg: typing.Optional[str] = ''):
 
