@@ -4,7 +4,7 @@ import os
 import discord
 from discord.ext import commands
 
-from config.config import Config
+from utils.config.config import Config
 
 bot = commands.Bot(command_prefix='?')
 config = Config()
