@@ -11,6 +11,9 @@ class Config:
         self.adminID: int = 0
         self.coAdminID: int = 0
         self.Owner: int = 0
+        self.db_user: str = ''
+        self.db_pass: str = ''
+        self.db_name: str = ''
 
         try:
             file = open(filename, 'x')
@@ -23,12 +26,15 @@ class Config:
 
     def write_conf(self, file):
         output = {
-            'token': '$YOURTOKENHERE',
+            'token': '$YOURTOKENHERE\n',
             'shards': '5',
-            'channel': '$YOURCHANNELIDHERE',
-            'admin': '$ADMINID',
-            'co-admin': '$COADAMINID',
-            'owner': '$YOURIDHERE'
+            'channel': '$YOURCHANNELIDHERE\n',
+            'admin': '$ADMINID\n',
+            'co-admin': '$COADAMINID\n',
+            'owner': '$YOURIDHERE\n',
+            'db_user': 'default\n',
+            'db_password': 'pass\n',
+            'db_name': 'db'
         }
         file.write(json.dumps(output))
 
@@ -41,3 +47,6 @@ class Config:
         self.adminID = int(config_parsed['admin'])
         self.coAdminID = int(config_parsed['co-admin'])
         self.Owner = int(config_parsed['owner'])
+        self.db_user = config_parsed['db_user']
+        self.db_pass = config_parsed['db_pass']
+        self.db_name = config_parsed['db_name']
