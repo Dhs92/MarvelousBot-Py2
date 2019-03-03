@@ -1,6 +1,6 @@
 import json
 
-
+# TODO REWRITE THIS PIECE OF CRAP
 class Config:
 
     def __init__(self, filename='utils/config/config.json'):

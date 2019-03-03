@@ -4,9 +4,11 @@ import os
 import discord
 from discord.ext import commands
 
+import utils.database as db
 from utils.config.config import Config
 
 bot = commands.Bot(command_prefix='!')
+bot.remove_command('help')
 config = Config()
 
 
@@ -14,8 +16,7 @@ config = Config()
 async def on_ready():
     logging.info(f'Logged in as {bot.user.name}')
     logging.info(f'Version: {discord.__version__}')
-
-    bot.remove_command('help')
+    await db.db_create()
 
     game = discord.Game(name='Grand Chase Dimensional Chasers')
     await bot.change_presence(activity=game)
@@ -26,10 +27,14 @@ if __name__ == '__main__':
     initial_extensions = ['commands.' + i.split('.')[0] for i in os.listdir('commands') if '.py' in i]
     logging.info(f'Extensions: {initial_extensions}')
     for extension in initial_extensions:
-        try:
-            bot.load_extension(extension)
-        except Exception as e:
-            logging.info(f'Failed to load extension {extension}')
+        bot.load_extension(extension)
+#        try:
+#            bot.load_extension(extension)
+#        except Exception as e:
+#            logging.info(f'Failed to load extension {extension}')
 
 
-bot.run(config.token, bot=True, reconnect=True)
+try:
+    bot.run(config.token, bot=True, reconnect=True)
+except KeyboardInterrupt:
+    bot.logout()

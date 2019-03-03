@@ -1,123 +1,140 @@
 import asyncio
 import logging
-import typing
 from datetime import datetime
+from datetime import timedelta
 
-import pytz
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
+import asyncpg
 from discord.ext import commands
 
-from utils.checks import is_admin
 from utils.config.config import Config
 
 config = Config()
 
 
-class Guild(commands.Cog):
-    def __init__(self, bot):
-        self.timezone = pytz.timezone('America/New_York')
-        self.now = datetime.now().astimezone(self.timezone) # make `now` timezone aware
+class GuildCommands(commands.Cog):
+    def __init__(self, bot: commands.Bot):
         self.bot = bot
-        self._summoned = False
-        self._delay = 0
-        self._timer = AsyncIOScheduler()
-        self._timer.start()
+        self._job_store = 'jobstore'
+        self._timer = None
+        self._fired = False
+        self.bot.loop.create_task(self.loop())
 
-    @commands.command(aliases=['summon', 'boss', 'gb'])
-    @is_admin(commands, config)
-    async def summoned(self, ctx, arg: typing.Optional[str] = ''):
+    # setting up the database and connection
+    async def connect(self) -> asyncpg.connection:
+        connection = await asyncpg.connect(host='localhost',
+                                           user=config.db_user,
+                                           password=config.db_pass,
+                                           database=self._job_store)
+        await connection.execute('''
+        create table if not exists jobs(job_id text primary key,
+                                        channel_id bigint,
+                                        time timestamp
+                                        );
+                                ''')
 
-        if arg.lower() == 'undo' and self._summoned:
-            await ctx.send('False alarm')
-            self._summoned = False
+        return connection
 
-        elif arg.lower() == 'undo' and not self._summoned:
-            await ctx.send('The boss hasn\'t been marked as summoned yet!')
+    # TODO add check for summoned command
+    # loop to check against database
+    async def loop(self):
+        connection = await self.connect()
 
-        elif not self._summoned:
-            self._summoned = True
-            await ctx.send('@everyone Guild Boss has been summoned')
-            logging.info(f'Boss has been marked as summoned by {ctx.author.name}')
+        while not self.bot.is_closed():
+            now = datetime.now()
+            timer = await connection.fetchval("SELECT time FROM jobs WHERE job_id = 'gw_sleep'")
+            channel = await connection.fetchval("SELECT channel_id FROM jobs WHERE job_id = 'gw_sleep'")
+            channel = self.bot.get_channel(channel)
 
-        elif self._summoned:
-            await ctx.send(f'The boss has already been summoned, {ctx.author.name}')
+            if (await self.guild_war_empty(connection) is not None) and (timer is not None) and (channel is not None):
+                if timer <= now:
+                    await channel.send('@everyone Guild war has started!')
+                    await asyncio.sleep(2)
+                    await connection.execute("DELETE FROM jobs WHERE job_id = 'gw_sleep'")
+                else:
+                    await asyncio.sleep(60)
 
+################################# COMMANDS #################################################
+############################################################################################
+    @commands.group(name='guildwar', aliases=['gw', 'guildw'], invoke_without_command=1)
+    @commands.has_any_role(['Guild Master', 'Co Master', 'Veterans'])
+    async def guild_war(self, ctx):  # used to create guild war reminder
+        await ctx.send('Please enter a sub-command: [add, cancel]')
+
+    async def guild_war_empty(self, connection: asyncpg.Connection):
+        if await connection.fetchrow("SELECT time FROM jobs where job_id = 'gw_sleep';") is None:
+            return None
         else:
-            logging.info('An unknown exception has occurred in `summoned`')
+            return 1
 
-    @summoned.error
-    async def summon_error(self, ctx, error):
-        if isinstance(error, commands.CheckFailure):
-            await ctx.send('You do not have permission to run this command!')
+    @guild_war.command(name='add')
+    @commands.has_any_role(['Guild Master', 'Co Master', 'Veterans'])
+    async def guild_war_add(self, ctx, hours: int, minutes: int):
 
-    @commands.command(aliases=['gw', 'guildw', 'guildwar'])
-    @is_admin(commands, config)
-    async def guild_war(self, ctx, hours: typing.Optional[int] = 0, minutes: typing.Optional[int] = 0,
-                        cancel: str = ''):
+        # get the connection
+        connection = await self.connect()
 
-        async def guild_war_message():
-            await ctx.send('@everyone Guild war has started!')
+        if await self.guild_war_empty(connection) is None:
+            now = datetime.now()
+            now += timedelta(hours=hours, minutes=minutes)
 
-        if cancel.lower() == 'cancel' and not self._delay == 0:
-            self._timer.remove_job(job_id='gw_sleep')
-            await ctx.send('Cancelled guild war timer')
-            self._delay = 0
+            logging.debug(f'Now: {now}')
 
-        elif cancel.lower() == 'cancel' and self._delay == 0:
-            await ctx.send('You haven\'t set a guild war timer yet!')
+            # store the channel ID from context
+            channel = ctx.channel.id
 
-        elif hours == 0 and minutes == 0 and cancel.lower() != 'cancel':
-            await ctx.send('Please enter a time in hours and minutes! (eg. `?guildwar 10 30`)')
-
-        elif self._delay == 0 and not cancel.lower == 'cancel':
-            self._delay = 0
-            self._delay += hours * 3600
-            self._delay += minutes * 60
             hours_string = str(hours) + (' hours and ' if hours != 1 else ' hour and ')
             empty = str()
+
             await ctx.send('@everyone Guild war will start in '
                            f'{hours_string if not hours == 0 else empty}{minutes} '
                            + ('minutes' if minutes != 1 else 'minute'))
-            self._timer.add_job(guild_war_message, trigger='interval', id='gw_sleep', seconds=self._delay)
-            await asyncio.sleep(self._delay + 10)
-            self._timer.remove_job('gw_sleep')
+
+            # add job to database
+            await connection.execute('''
+            insert into jobs(job_id, channel_id, time)
+            values('gw_sleep', $1, $2);
+            ''', channel, now)
+
+        elif await self.guild_war_empty(connection) is not None:
+            await ctx.send('You already set a timer!')
         else:
-            await ctx.send('Fuck something went wrong')
+            pass
 
-    @guild_war.error
-    async def summon_error(self, ctx, error):
-        if isinstance(error, commands.CheckFailure):
-            await ctx.send('You do not have permission to run this command!')
+        await connection.close()
 
-    async def schedule_message(self):
-        await self.bot.wait_until_ready()
-        channel = self.bot.get_channel(int(config.channel))
-        self.bot.fired = False
+    @guild_war.command(name='cancel')
+    @commands.has_any_role(['Guild Master', 'Co Master', 'Veterans'])
+    async def guild_war_rm(self, ctx):
+        connection = await self.connect()
 
-        while not self.bot.is_closed():
-            self.bot.fired = False 
+        if await self.guild_war_empty(connection) is not None:
+            await connection.execute("DELETE FROM jobs WHERE job_id = 'gw_sleep';")
+            await ctx.send('Guild war reminder cancelled')
+        else:
+            await ctx.send('You haven\'t set a reminder yet!')
 
-            if self.bot.summoned:  # if the summoned command is run, sleep until out of range
-                await asyncio.sleep(28800) # 8 hours
-                self.bot.summoned = False
+        await connection.close()
 
-            elif (self.now.hour == 12) and (self.now.weekday() == 1 or self.now.weekday() == 3) \
-                    and not self.bot.summoned:
-                await channel.send(f'<@{config.adminID}>, <@{config.coAdminID}> Don\'t forget to summon the guild boss!')
-                self.bot.fired = True
+    # TODO add next job to db on execute
+    @commands.group(name='summoned', invoke_without_command=1)
+    @commands.has_any_role(['Guild Master', 'Co Master'])
+    async def guild_summoned(self, ctx):
+        if not self._fired:
+            await ctx.send('@everyone The guild boss has been summoned!')
+            self._fired = True
+        else:
+            await ctx.send('You have already marked the guild boss as summoned!')
 
-            elif (self.now.hour == 23) and (
-                    self.now.weekday() == 0 or self.now.weekday() == 2 or self.now.weekday() == 4) \
-                    and not self.bot.summoned:
-                await channel.send(f'<@{config.adminID}>, <@{config.coAdminID}> Don\'t forget to summon the guild boss!')
-                self.bot.fired = True
-
-            if self.bot.fired:  # if message has fired, sleep until out of range
-                await asyncio.sleep(28800)  # 8 hours
-                self.bot.fired = False
-
-            await asyncio.sleep(900)  # 15 minutes
+    @guild_summoned.command(name='cancel')
+    @commands.has_any_role(['Guild Master', 'Co Master'])
+    async def guild_summoned_cancel(self, ctx):
+        if self._fired:
+            await ctx.send('False alarm!')
+            self._fired = False
+        else:
+            await ctx.send("You haven't marked the guild boss as summoned yet!")
 
 
 def setup(bot):
-    bot.add_cog(Guild(bot))
+    bot.add_cog(GuildCommands(bot))
+
