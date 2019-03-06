@@ -161,15 +161,12 @@ class GuildCommands(commands.Cog):
     @guild_war.command(name='cancel')
     @commands.has_any_role('Guild Master', 'Co Master', 'Veterans')
     async def guild_war_rm(self, ctx):
-        connection = await self.connect()
-
-        if await self.guild_war_empty('gw_sleep') is not None:
-            await connection.execute("DELETE FROM jobs WHERE job_id = 'gw_sleep';")
-            await ctx.send('Guild war reminder cancelled')
-        else:
-            await ctx.send('You haven\'t set a reminder yet!')
-
-        await connection.close()
+        with self.pool.acquire() as connection:
+            if await self.guild_war_empty('gw_sleep') is not None:
+                await connection.execute("DELETE FROM jobs WHERE job_id = 'gw_sleep';")
+                await ctx.send('Guild war reminder cancelled')
+            else:
+                await ctx.send('You haven\'t set a reminder yet!')
 
     @commands.group(name='summoned', invoke_without_command=1)
     @commands.has_any_role('Guild Master', 'Co Master')
