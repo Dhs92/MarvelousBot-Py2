@@ -27,6 +27,7 @@ class GuildCommands(commands.Cog):
                                               user=config.db_user,
                                               password=config.db_pass,
                                               database=self._job_store)
+
         async with self.pool.acquire() as connection:
             async with connection.transaction():
                 await connection.execute('''
@@ -102,7 +103,7 @@ class GuildCommands(commands.Cog):
         channel = config.channel
         now = datetime.now()
         job_id = ['summon_1', 'summon_2']
-        schedule = [croniter('0 06 * * 0,2,4 *', now), croniter('0 18 * * 3,5 *', now)]
+        schedule = [croniter('0 06 * * 0,2,4 *', now), croniter('0 18 * * 1,3 *', now)]
         next_run = [schedule[0].get_next(datetime), schedule[1].get_next(datetime)]
         msg = f"<@{config.adminID}>, <@{config.coAdminID}> Don't forget to summon the guild boss!"
         async with self.pool.acquire() as connection:
