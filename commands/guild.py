@@ -27,7 +27,6 @@ class GuildCommands(commands.Cog):
                                               user=config.db_user,
                                               password=config.db_pass,
                                               database=self._job_store)
-
         async with self.pool.acquire() as connection:
             async with connection.transaction():
                 await connection.execute('''

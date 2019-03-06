@@ -8,3 +8,5 @@ def is_owner(commands, config):
     async def predicate(ctx):
         return ctx.author.id == config.Owner
     return commands.check(predicate)
+
+# TODO deprecate
