@@ -6,6 +6,7 @@ from datetime import timedelta
 import asyncpg
 from croniter import croniter
 from discord.ext import commands
+from pytz import timezone
 
 from utils.config.config import Config
 
@@ -18,6 +19,7 @@ class GuildCommands(commands.Cog):
         self._job_store = 'jobstore'
         self._fired = False
         self.pool: asyncpg.pool = None
+        self._timezone = timezone('America/New_York')
         self.bot.loop.create_task(self.connect())
         self.bot.loop.create_task(self.loop())
 
@@ -50,14 +52,22 @@ class GuildCommands(commands.Cog):
         if self.bot.is_ready():
             while not self.bot.is_closed():
                 async with self.pool.acquire() as connection:
-                    now = datetime.now()
+                    now = datetime.utcnow().replace(tzinfo=timezone('UTC')).astimezone(self._timezone)
                     result = await connection.fetch("select * from jobs;")
 
                     for job_id, channel, time, msg in result:
                         if (await self.guild_war_empty(job_id) is not None) \
                                 and (time is not None) and (channel is not None):
 
+                            time = time.replace(tzinfo=timezone('UTC'))
+                            time = time.astimezone(self._timezone)
                             channel = self.bot.get_channel(channel)
+
+                            logging.info(f'ID: {job_id}')
+                            logging.info(f'Time: {time}')
+                            logging.info(f'Now: {now}')
+                            logging.info(f'Channel ID: {channel}')
+
                             if time <= now:
                                 if job_id is not 'summon_1' and job_id is not 'summon_2':
                                     await channel.send(msg)
@@ -67,6 +77,7 @@ class GuildCommands(commands.Cog):
                                     logging.debug(f'ID: {job_id}')
                                     logging.debug(f'Time: {time}')
                                     logging.debug(f'Channel ID: {channel}')
+                                    logging.info('From: 1')
 
                                 elif job_id is 'summoned_1' or job_id is 'summoned_2' and not self._fired:
                                     await channel.send(msg)
@@ -77,6 +88,7 @@ class GuildCommands(commands.Cog):
                                     logging.debug(f'ID: {job_id}')
                                     logging.debug(f'Time: {time}')
                                     logging.debug(f'Channel ID: {channel}')
+                                    logging.info('From: 2')
 
                                 elif job_id is 'summoned_1' or job_id is 'summoned_2' and self._fired:
                                     await connection.execute("DELETE FROM jobs WHERE job_id = $1", job_id)
@@ -86,6 +98,7 @@ class GuildCommands(commands.Cog):
                                     logging.debug(f'ID: {job_id}')
                                     logging.debug(f'Time: {time}')
                                     logging.debug(f'Channel ID: {channel}')
+                                    logging.info('From: 3')
                             else:
                                 await asyncio.sleep(15)
                         else:
@@ -101,11 +114,17 @@ class GuildCommands(commands.Cog):
     @commands.command(name='tmp')
     async def guild_schedule_next(self, ctx):
         channel = config.channel
-        now = datetime.now()
+        now = datetime.utcnow()
+
         job_id = ['summon_1', 'summon_2']
-        schedule = [croniter('0 06 * * 0,2,4 *', now), croniter('0 18 * * 1,3 *', now)]
+        schedule = [croniter('0 04 * * tue,thu,sat *', now), croniter('0 17 * * tue,thu *', now)]  # create a list of
+        # croniter times
+
+        # get next run time for the job using croniter objects
         next_run = [schedule[0].get_next(datetime), schedule[1].get_next(datetime)]
+
         msg = f"<@{config.adminID}>, <@{config.coAdminID}> Don't forget to summon the guild boss!"
+
         async with self.pool.acquire() as connection:
             async with connection.transaction():
                 for job, next_r in zip(job_id, next_run):

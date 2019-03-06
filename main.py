@@ -7,7 +7,7 @@ from discord.ext import commands
 import utils.database as db
 from utils.config.config import Config
 
-bot = commands.Bot(command_prefix='!')
+bot = commands.Bot(command_prefix='?')
 bot.remove_command('help')
 config = Config()
 
