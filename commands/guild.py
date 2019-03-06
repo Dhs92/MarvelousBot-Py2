@@ -147,11 +147,13 @@ class GuildCommands(commands.Cog):
                            f'{hours_string if not hours == 0 else empty}{minutes} '
                            + ('minutes' if minutes != 1 else 'minute'))
 
-            # add job to database
-            await self.pool.execute('''
-            insert into jobs(job_id, channel_id, time, msg)
-            values('gw_sleep', $1, $2, $3);
-            ''', channel, now, msg)
+            async with self.pool.acquire() as connection:
+                async with connection.transaction():
+                    # add job to database
+                    await connection.execute('''
+                    insert into jobs(job_id, channel_id, time, msg)
+                    values('gw_sleep', $1, $2, $3);
+                    ''', channel, now, msg)
 
         elif await self.guild_war_empty('gw_sleep') is not None:
             await ctx.send('You already set a timer!')
@@ -161,12 +163,13 @@ class GuildCommands(commands.Cog):
     @guild_war.command(name='cancel')
     @commands.has_any_role('Guild Master', 'Co Master', 'Veterans')
     async def guild_war_rm(self, ctx):
-        with self.pool.acquire() as connection:
-            if await self.guild_war_empty('gw_sleep') is not None:
-                await connection.execute("DELETE FROM jobs WHERE job_id = 'gw_sleep';")
-                await ctx.send('Guild war reminder cancelled')
-            else:
-                await ctx.send('You haven\'t set a reminder yet!')
+        async with self.pool.acquire() as connection:
+            async with connection.transaction():
+                if await self.guild_war_empty('gw_sleep') is not None:
+                    await connection.execute("DELETE FROM jobs WHERE job_id = 'gw_sleep';")
+                    await ctx.send('Guild war reminder cancelled')
+                else:
+                    await ctx.send('You haven\'t set a reminder yet!')
 
     @commands.group(name='summoned', invoke_without_command=1)
     @commands.has_any_role('Guild Master', 'Co Master')
