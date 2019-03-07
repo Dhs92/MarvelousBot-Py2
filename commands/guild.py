@@ -63,11 +63,6 @@ class GuildCommands(commands.Cog):
                             time = time.astimezone(self._timezone)
                             channel = self.bot.get_channel(channel)
 
-                            logging.info(f'ID: {job_id}')
-                            logging.info(f'Time: {time}')
-                            logging.info(f'Now: {now}')
-                            logging.info(f'Channel ID: {channel}')
-
                             if time <= now:
                                 if job_id is not 'summon_1' and job_id is not 'summon_2':
                                     await channel.send(msg)
@@ -151,7 +146,7 @@ class GuildCommands(commands.Cog):
         # get the connection
 
         if await self.guild_war_empty('gw_sleep') is None:
-            now = datetime.now()
+            now = datetime.utcnow()
             now += timedelta(hours=hours, minutes=minutes)
 
             logging.debug(f'Now: {now}')
