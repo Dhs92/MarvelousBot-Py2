@@ -1,5 +1,6 @@
 import json
 
+
 # TODO REWRITE THIS PIECE OF CRAP
 class Config:
 
